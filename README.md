@@ -1,2 +1,2 @@
 # TidyTuesday
-Exercises I do from #TidyTuesday
+Some sonnets from #TidyTuesday
