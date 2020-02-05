@@ -1,0 +1,122 @@
+---
+title: "Added percentages of man-made deaths in EMRO countries, 1990- 2016"
+author: "Manal"
+date: 2020-01-30
+---
+
+In this post, I aim to visualize the man-made causes of death (i.e. conflicts, homicide, suicide & terrorism) in 22 EMRO countries. Here I am using bar plot to do that, but I will do it in a map in another post.
+
+The data is from 1990- 2016 for countries and some regions, and including many causes of deaths.
+
+### Load the libraries
+
+```{r setup, warning=FALSE}
+library(tidyverse)
+library(knitr)
+library(httr)
+library(readxl)
+library(skimr)
+library(wesanderson)
+library(RColorBrewer)
+library(scales)
+```
+
+### Download the data 
+
+This method I followed from one rstudio post, so that this blog post is linked to the data. However, it is also possible to download the data using this [source](https://github.com/rfordatascience/tidytuesday/tree/master/data/2018/2018-04-16) and import it into RStudio directly.
+
+```{r warning = FALSE}
+github_link <- "https://github.com/rfordatascience/tidytuesday/raw/master/data/2018/2018-04-16/global_mortality.xlsx"
+temp_file <- tempfile(fileext = ".xlsx")
+req <- GET(github_link, 
+          # authenticate using GITHUB_PAT
+           authenticate(Sys.getenv("GITHUB_PAT"), ""),
+          # write result to disk
+           write_disk(path = temp_file))
+mortality <-read_excel(temp_file)
+```
+
+
+### Exploring the data
+
+
+```{r warning = FALSE}
+glimpse(mortality)
+```
+
+
+### Create a subset of WHO EMRO countries (22 countries)
+Based on [WHO classification](http://www.emro.who.int/countries.html), I create a subset data to include these 22 countries.
+
+```{r warning = FALSE}
+meast <- mortality %>% filter(country %in% c('Afghanistan', 'Djibouti', 'Bahrain', 
+                                            'Libya', 'Morocco', 'Egypt', 
+                                            'Iran', 'Iraq', 'Pakistan', 'Somalia', 'Jordan', 
+                                            'Kuwait', 'Lebanon', 'Oman', 
+                                            'Palestine', 'Saudi Arabia', 
+                                            'Qatar', 'Syria', 
+                                            'United Arab Emirates', 'Yemen', 
+                                            'Sudan', 'Tunisia'))
+
+```
+
+### tidy the data
+Here I created an interval of 10 years to facilitate visualizing it.
+
+```{r warning = FALSE}
+cause_gathered <- meast %>% 
+    gather(key = "cause", value = "percent", -year, -country, -country_code)
+
+conflict <- cause_gathered %>% 
+                  filter(cause == "Conflict (%)"| cause == "Terrorism (%)"|
+                        cause == "Suicide (%)" | cause == "Homicide (%)") %>%
+                  separate(cause, c("cause", "(%)"), sep = "( )") %>% 
+                  select(country, year, cause, percent) %>%
+                  mutate(percent_decimal = percent / 100) %>% 
+                  arrange(desc(percent_decimal)) %>%
+                  filter(!is.na(percent_decimal)) %>% 
+                  mutate(year_class = case_when(between(year, 1990, 2000) ~ "1990-2000",
+                                between(year, 2001, 2010) ~ "2001-2010",
+                                between(year, 2011, 2016) ~ "2011-2016"))
+                   
+```
+
+### Graph
+Finally, ggplot the data
+  
+```{r, warning = FALSE}
+library(tidytext)  
+
+conflict %>% 
+  mutate(country = reorder_within(country, percent_decimal, year_class)) %>% 
+  ggplot(aes(x = country,y = percent_decimal, fill = cause)) + 
+                        geom_col() +
+                        facet_wrap(~ year_class, scales = "free", ncol = 3) +
+                        coord_flip() +
+                        scale_x_reordered() +
+                        theme_minimal() +
+                        scale_fill_manual(values = wes_palette("GrandBudapest1", n = 4)) +
+                        scale_y_continuous(labels = percent_format()) +
+                        labs(y = " ",
+                            x = " ",
+                            fill = "Cause", 
+                            title = "Added percentages of Man-made deaths in EMRO countries, 1990- 2016")
+
+
+
+conflict %>% 
+  mutate(country = reorder_within(country, percent_decimal, year_class)) %>% 
+  ggplot(aes(x = country,y = percent_decimal, fill = cause)) + 
+  geom_col() +
+  facet_wrap(~ year_class, scales = "free", ncol = 3) +
+  coord_flip() +
+  scale_x_reordered() +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Set1") +
+  scale_y_continuous(labels = percent_format()) +
+  labs(y = " ",
+       x = " ",
+       fill = "Cause", 
+       title = "Added percentages of Man-made deaths in EMRO countries, 1990- 2016")
+```
+
